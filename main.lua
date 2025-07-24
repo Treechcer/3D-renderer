@@ -1,15 +1,40 @@
 love = require("love")
 
 function love.load()
+    love.mouse.setRelativeMode(true)
+    prevMouseX, prevMouseY = love.mouse.getPosition()
+
     points = {
-        {-1,-1,1},
-        {1,-1,1},
-        {1,1,1},
-        {-1,1,1},
-        {-1,-1,-1},
-        {1,-1,-1},
-        {1,1,-1},
-        {-1,1,-1}
+        {
+            metadata = {
+                posX = 0,
+                posY = 0,
+                posZ = 0,
+            },
+            {-1,-1,1},
+            {1,-1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        },
+        {
+            metadata = {
+                posX = 2,
+                posY = 0,
+                posZ = 0,
+            },
+            {-1,-1,1},
+            {1,-1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        }
     }
 
     projectedMatrix = {
@@ -24,54 +49,105 @@ function love.load()
 
     pos = {width / 2, height / 2}
 
-    angle = 0
+    camera = {
+        posX = 0,
+        posY = 0,
+        posZ = -5,
+        angle = 0,
+
+        speed = 10,
+
+        yaw = 0, -- horizontal angle
+        pitch = 0, -- vertical angle
+        sensitivity = 0.002 -- sensitivity of mouse
+    }
 end
 
 function love.draw()
     zRotationAngle = {
-        {math.cos(angle), -math.sin(angle), 0},
-        {math.sin(angle), math.cos(angle), 0},
+        {math.cos(camera.angle), -math.sin(camera.angle), 0},
+        {math.sin(camera.angle), math.cos(camera.angle), 0},
         {0,0,1}
     }
 
-    yRotationAngle = {
-        {math.cos(angle), 0, math.sin(angle)},
-        {0,1,0},
-        {-math.sin(angle),0 ,  math.cos(angle)},
+    local yRotationAngle = {
+        {math.cos(camera.yaw), 0, math.sin(camera.yaw)},
+        {0, 1, 0},
+        {-math.sin(camera.yaw), 0, math.cos(camera.yaw)},
     }
 
-    xRotationAngle = {
-        {1,0,0},
-        {0, math.cos(angle), -math.sin(angle)},
-        {0, math.sin(angle), math.cos(angle)},
+    local xRotationAngle = {
+        {1, 0, 0},
+        {0, math.cos(camera.pitch), -math.sin(camera.pitch)},
+        {0, math.sin(camera.pitch), math.cos(camera.pitch)},
     }
+    for key, value in pairs(points) do
+        projectedPoints = {}
 
-    projectedPoints = {}
+        for i = 1, #points[key] do
 
-    for i = 1, #points do
-        rotate = matrixMultiply(zRotationAngle, points[i])
+            local WorldPoint = {
+                points[key][i][1] + points[key].metadata.posX,
+                points[key][i][2] + points[key].metadata.posY,
+                points[key][i][3] + points[key].metadata.posZ
+            }
 
-        rotate = matrixMultiply(xRotationAngle, rotate)
+            local relativePos ={
+                WorldPoint[1] - camera.posX,
+                WorldPoint[2] - camera.posY,
+                WorldPoint[3] - camera.posZ
+            }
 
-        projected = matrixMultiply(projectedMatrix, rotate)
+            local rotate = matrixMultiply(yRotationAngle, relativePos)
+            rotate = matrixMultiply(xRotationAngle, rotate)
 
-        x = projected[1] * scale + pos[1]
-        y = projected[2] * scale + pos[2]
+            local projected = matrixMultiply(projectedMatrix, rotate)
 
-        love.graphics.circle("fill", x, y, 5)
+            projected[1] = projected[1] / rotate[3]
+            projected[2] = projected[2] / rotate[3]
 
-        table.insert(projectedPoints, {x = x, y = y})
-    end
+            local x = projected[1] * scale + pos[1]
+            local y = projected[2] * scale + pos[2]
 
-    for i = 1, 4 do
-        connectPoint(i, (i % 4) + 1, projectedPoints)
-        connectPoint(i + 4, (i % 4) + 5, projectedPoints)
-        connectPoint(i, i + 4, projectedPoints)
+            if rotate[3] > 0 then
+                love.graphics.circle("fill", x, y, math.min(2500 / calculateDistance(camera.posX, camera.posY, camera.posZ, x, y, rotate[3]), 5))
+
+                projectedPoints[i] = {x = x, y = y}
+            else
+                projectedPoints[i] = nil
+            end
+        end
+
+        for i = 1, 4 do
+            connectPoint(i, (i % 4) + 1, projectedPoints)
+            connectPoint(i + 4, (i % 4) + 5, projectedPoints)
+            connectPoint(i, i + 4, projectedPoints)
+        end
     end
 end
 
 function love.update(dt)
-    angle = angle + 1 * dt
+    local forward = 0
+    local right = 0
+
+    if love.keyboard.isDown("w") then
+        forward = 1
+    elseif love.keyboard.isDown("s") then
+        forward = -1
+    end
+
+    if love.keyboard.isDown("a") then
+        right = -1
+    elseif love.keyboard.isDown("d") then
+        right = 1
+    end
+
+    camera.posX = camera.posX + (math.sin(camera.yaw) * forward + math.sin(camera.yaw + math.pi/2) * right) * camera.speed * dt
+    camera.posZ = camera.posZ + (math.cos(camera.yaw) * forward + math.cos(camera.yaw + math.pi/2) * right) * camera.speed * dt
+
+    if love.keyboard.isDown("q") then
+        love.event.quit()
+    end
 end
 
 function matrixMultiply(projectedMatrix, multiplyMatrix)
@@ -87,5 +163,16 @@ function matrixMultiply(projectedMatrix, multiplyMatrix)
 end
 
 function connectPoint(i, j, points)
-    love.graphics.line(points[i].x, points[i].y, points[j].x, points[j].y)
+    if points[i] and points[j] then
+        love.graphics.line(points[i].x, points[i].y, points[j].x, points[j].y)
+    end
+end
+
+function calculateDistance(x1, y1, z1, x2, y2, z2)
+    return (((x2 - x1) ^ 2) + ((y2 - y1) ^ 2) + ((z2 - z1) ^ 2)) ^ 0.5
+end
+
+function love.mousemoved(dx, dy, x, y, istouch)
+    camera.yaw = camera.yaw + x * camera.sensitivity
+    camera.pitch = camera.pitch - y * camera.sensitivity
 end
