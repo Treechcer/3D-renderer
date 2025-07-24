@@ -1,6 +1,13 @@
 love = require("love")
 
 function love.load()
+
+    matrixMath = require("math.matrixMath")
+    JEM = require("math.JustEnoughMath")
+    player = require("game.properties.player")
+    renderer = require("game.render.renderer")
+    meshes = require("game.render.meshes")
+
     love.mouse.setRelativeMode(true)
     prevMouseX, prevMouseY = love.mouse.getPosition()
 
@@ -10,6 +17,7 @@ function love.load()
                 posX = 0,
                 posY = 0,
                 posZ = 0,
+                color = {1,0,0,1},
             },
             {-1,-1,1},
             {1,-1,1},
@@ -25,6 +33,7 @@ function love.load()
                 posX = 2,
                 posY = 0,
                 posZ = 0,
+                color = {0,1,1,1},
             },
             {-1,-1,1},
             {1,-1,1},
@@ -37,10 +46,13 @@ function love.load()
         }
     }
 
-    projectedMatrix = {
-        {1,0,0},
-        {0,1,0},
-        {0,0,0}
+    faces = {
+        {1, 2, 3, 4}, -- front
+        {5, 6, 7, 8}, -- back
+        {1, 5, 8, 4}, -- left
+        {2, 6, 7, 3}, -- right
+        {4, 3, 7, 8}, -- top
+        {1, 2, 6, 5}  -- bottom
     }
 
     scale = 100
@@ -48,60 +60,27 @@ function love.load()
     width, height = love.graphics.getDimensions()
 
     pos = {width / 2, height / 2}
-
-    camera = {
-        posX = 0,
-        posY = 0,
-        posZ = -5,
-        angle = 0,
-
-        speed = 10,
-
-        yaw = 0, -- horizontal angle
-        pitch = 0, -- vertical angle
-        sensitivity = 0.002 -- sensitivity of mouse
-    }
 end
 
 function love.draw()
-    zRotationAngle = {
-        {math.cos(camera.angle), -math.sin(camera.angle), 0},
-        {math.sin(camera.angle), math.cos(camera.angle), 0},
-        {0,0,1}
-    }
-
-    local yRotationAngle = {
-        {math.cos(camera.yaw), 0, math.sin(camera.yaw)},
-        {0, 1, 0},
-        {-math.sin(camera.yaw), 0, math.cos(camera.yaw)},
-    }
-
-    local xRotationAngle = {
-        {1, 0, 0},
-        {0, math.cos(camera.pitch), -math.sin(camera.pitch)},
-        {0, math.sin(camera.pitch), math.cos(camera.pitch)},
-    }
     for key, value in pairs(points) do
-        projectedPoints = {}
+        matrixMath.calculateProjections()
+        local projectedPoints = {}
 
-        for i = 1, #points[key] do
+        for i = 1, 8 do
+            local WorldPoint = JEM.WorldPoint(points, i, key)
 
-            local WorldPoint = {
-                points[key][i][1] + points[key].metadata.posX,
-                points[key][i][2] + points[key].metadata.posY,
-                points[key][i][3] + points[key].metadata.posZ
+            local relativePos = {
+                WorldPoint[1] - player.camera.posX,
+                WorldPoint[2] - player.camera.posY,
+                WorldPoint[3] - player.camera.posZ
             }
 
-            local relativePos ={
-                WorldPoint[1] - camera.posX,
-                WorldPoint[2] - camera.posY,
-                WorldPoint[3] - camera.posZ
-            }
+            local rotate = matrixMath.matrixMultiply(matrixMath.yRotationAngle, relativePos)
+            rotate = matrixMath.matrixMultiply(matrixMath.xRotationAngle, rotate)
+            rotate = matrixMath.matrixMultiply(matrixMath.zRotationAngle, rotate)
 
-            local rotate = matrixMultiply(yRotationAngle, relativePos)
-            rotate = matrixMultiply(xRotationAngle, rotate)
-
-            local projected = matrixMultiply(projectedMatrix, rotate)
+            local projected = matrixMath.matrixMultiply(matrixMath.projectedMatrix, rotate)
 
             projected[1] = projected[1] / rotate[3]
             projected[2] = projected[2] / rotate[3]
@@ -110,18 +89,44 @@ function love.draw()
             local y = projected[2] * scale + pos[2]
 
             if rotate[3] > 0 then
-                love.graphics.circle("fill", x, y, math.min(2500 / calculateDistance(camera.posX, camera.posY, camera.posZ, x, y, rotate[3]), 5))
-
-                projectedPoints[i] = {x = x, y = y}
+                projectedPoints[i] = {x = x, y = y, z = rotate[3]}
             else
                 projectedPoints[i] = nil
             end
         end
 
-        for i = 1, 4 do
-            connectPoint(i, (i % 4) + 1, projectedPoints)
-            connectPoint(i + 4, (i % 4) + 5, projectedPoints)
-            connectPoint(i, i + 4, projectedPoints)
+        local sortedTable = {}
+
+        for index0, value0 in ipairs(projectedPoints) do
+            table.insert(sortedTable, {distance = JEM.calculateDistance(player.camera.posX, player.camera.posY, player.camera.posZ, projectedPoints[index0].x, projectedPoints[index0].y, projectedPoints[index0].z),
+                x = projectedPoints[index0].x,
+                y = projectedPoints[index0].y,
+                z = projectedPoints[index0].z
+            })
+        end
+
+        table.sort(sortedTable, function(a, b) return a.distance > b.distance end)
+
+        local col = points[key].metadata.color
+
+        for _, face in ipairs(faces) do
+            local verts = {}
+
+            local faceIsVisible = true
+            for _, i in ipairs(face) do
+                if not sortedTable[i] then
+                    faceIsVisible = false
+                    break
+                end
+
+                local v = sortedTable[i]
+                table.insert(verts, {v.x, v.y, v.z, 0, col[1], col[2], col[3], col[4]})
+            end
+
+            if faceIsVisible then
+                meshes.block1:setVertices(verts)
+                love.graphics.draw(meshes.block1)
+            end
         end
     end
 end
@@ -142,24 +147,18 @@ function love.update(dt)
         right = 1
     end
 
-    camera.posX = camera.posX + (math.sin(camera.yaw) * forward + math.sin(camera.yaw + math.pi/2) * right) * camera.speed * dt
-    camera.posZ = camera.posZ + (math.cos(camera.yaw) * forward + math.cos(camera.yaw + math.pi/2) * right) * camera.speed * dt
+    player.camera.posX = player.camera.posX + (math.sin(player.camera.yaw) * forward + math.sin(player.camera.yaw + math.pi/2) * right) * player.camera.speed * dt
+    player.camera.posZ = player.camera.posZ + (math.cos(player.camera.yaw) * forward + math.cos(player.camera.yaw + math.pi/2) * right) * player.camera.speed * dt
+
+    if love.keyboard.isDown("space") then
+        player.camera.posY = player.camera.posY - player.camera.speed * dt
+    elseif love.keyboard.isDown("lshift") then
+        player.camera.posY = player.camera.posY + player.camera.speed * dt
+    end
 
     if love.keyboard.isDown("q") then
         love.event.quit()
     end
-end
-
-function matrixMultiply(projectedMatrix, multiplyMatrix)
-    res = {0,0,0}
-
-    for i = 1, 3 do
-        for j = 1, 3 do
-            res[i] = (multiplyMatrix[j] * projectedMatrix[j][i]) + res[i]
-        end
-    end
-
-    return res
 end
 
 function connectPoint(i, j, points)
@@ -168,11 +167,7 @@ function connectPoint(i, j, points)
     end
 end
 
-function calculateDistance(x1, y1, z1, x2, y2, z2)
-    return (((x2 - x1) ^ 2) + ((y2 - y1) ^ 2) + ((z2 - z1) ^ 2)) ^ 0.5
-end
-
 function love.mousemoved(dx, dy, x, y, istouch)
-    camera.yaw = camera.yaw + x * camera.sensitivity
-    camera.pitch = camera.pitch - y * camera.sensitivity
+    player.camera.yaw = player.camera.yaw + x * player.camera.sensitivity
+    player.camera.pitch = player.camera.pitch - y * player.camera.sensitivity
 end
