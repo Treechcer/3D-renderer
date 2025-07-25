@@ -17,7 +17,7 @@ function love.load()
                 posX = 0,
                 posY = 0,
                 posZ = 0,
-                color = {1,0,0,1},
+                color = {246/255, 83/255, 20/255,1},
             },
             {-1,-1,1},
             {1,-1,1},
@@ -33,7 +33,39 @@ function love.load()
                 posX = 2,
                 posY = 0,
                 posZ = 0,
-                color = {0,1,1,1},
+                color = {124/255, 187/255, 0/255,1},
+            },
+            {-1,-1,1},
+            {1,-1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        },
+        {
+            metadata = {
+                posX = 2,
+                posY = 2,
+                posZ = 0,
+                color = {255/255, 187/255, 0/255,1},
+            },
+            {-1,-1,1},
+            {1,-1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        },
+        {
+            metadata = {
+                posX = 0,
+                posY = 2,
+                posZ = 0,
+                color = {0/255, 164/255, 239/255,1},
             },
             {-1,-1,1},
             {1,-1,1},
@@ -63,6 +95,8 @@ function love.load()
 end
 
 function love.draw()
+    local facesToDraw = {}
+
     for key, value in pairs(points) do
         matrixMath.calculateProjections()
         local projectedPoints = {}
@@ -95,39 +129,40 @@ function love.draw()
             end
         end
 
-        local sortedTable = {}
-
-        for index0, value0 in ipairs(projectedPoints) do
-            table.insert(sortedTable, {distance = JEM.calculateDistance(player.camera.posX, player.camera.posY, player.camera.posZ, projectedPoints[index0].x, projectedPoints[index0].y, projectedPoints[index0].z),
-                x = projectedPoints[index0].x,
-                y = projectedPoints[index0].y,
-                z = projectedPoints[index0].z
-            })
-        end
-
-        table.sort(sortedTable, function(a, b) return a.distance > b.distance end)
-
         local col = points[key].metadata.color
 
         for _, face in ipairs(faces) do
             local verts = {}
+            local sumZ = 0
+            local count = 0
 
             local faceIsVisible = true
             for _, i in ipairs(face) do
-                if not sortedTable[i] then
+                local v = projectedPoints[i]
+                if not v then
                     faceIsVisible = false
                     break
                 end
 
-                local v = sortedTable[i]
                 table.insert(verts, {v.x, v.y, v.z, 0, col[1], col[2], col[3], col[4]})
+                sumZ = sumZ + v.z
+                count = count + 1
             end
 
-            if faceIsVisible then
-                meshes.block1:setVertices(verts)
-                love.graphics.draw(meshes.block1)
+            if faceIsVisible and count > 0 then
+                local avgZ = sumZ / count
+                table.insert(facesToDraw, {verts = verts, avgZ = avgZ})
             end
         end
+    end
+
+    table.sort(facesToDraw, function(a, b)
+        return a.avgZ > b.avgZ
+    end)
+
+    for _, faceData in ipairs(facesToDraw) do
+        meshes.block1:setVertices(faceData.verts)
+        love.graphics.draw(meshes.block1)
     end
 end
 
