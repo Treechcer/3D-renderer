@@ -7,6 +7,12 @@ function love.load()
     player = require("game.properties.player")
     renderer = require("game.render.renderer")
     meshes = require("game.render.meshes")
+    points = require("game.properties.points")
+
+    generatePoints = require("game.properties.generatePoints")
+    generatePoints.mapGen(10, 10, 10)
+
+    points = points.points
 
     love.mouse.setRelativeMode(true)
     prevMouseX, prevMouseY = love.mouse.getPosition()
@@ -45,90 +51,48 @@ function love.load()
         slope = {
             {-1,-1,1},
             {1,1,1},
-            {1,1,1},
+            --{1,1,1},
             {-1,1,1},
             {-1,-1,-1},
-            {1,1,-1},
+            --{1,1,-1},
             {1,1,-1},
             {-1,1,-1}
         }
     }
 
-    points = {
-        {
-            metadata = {
-                posX = 0,
-                posY = 0,
-                posZ = 0,
-                color = {246/255, 83/255, 20/255,1},
-
-                rotX = 0,
-                rotY = 0,
-                rotZ = 0,
-            },
-            type = "block"
-        },
-        {
-            metadata = {
-                posX = 2,
-                posY = 0,
-                posZ = 0,
-                color = {124/255, 187/255, 0/255,1},
-
-                rotX = 0,
-                rotY = 0,
-                rotZ = 0,
-            },
-            type = "block"
-        },
-        {
-            metadata = {
-                posX = 2,
-                posY = 2,
-                posZ = 0,
-                color = {255/255, 187/255, 0/255,1},
-
-                rotX = 0,
-                rotY = 0,
-                rotZ = 0,
-            },
-            type = "block"
-        },
-        {
-            metadata = {
-                posX = 0,
-                posY = 2,
-                posZ = 0,
-                color = {0/255, 164/255, 239/255,1},
-
-                rotX = 0,
-                rotY = 0,
-                rotZ = 0,
-            },
-            type = "block"
-        },
-        {
-            metadata = {
-                posX = 4,
-                posY = 4,
-                posZ = 0,
-                color = {0/255, 164/255, 239/255,1},
-
-                rotX = 0,
-                rotY = 0,
-                rotZ = 0,
-            },
-            type = "slope"
-        }
-    }
-
     faces = {
-        {1, 2, 3, 4}, -- front
-        {5, 6, 7, 8}, -- back
-        {1, 5, 8, 4}, -- left
-        {2, 6, 7, 3}, -- right
-        {4, 3, 7, 8}, -- top
-        {1, 2, 6, 5}  -- bottom
+        block = {
+            {1, 2, 3, 4}, -- front
+            {5, 6, 7, 8}, -- back
+            {1, 5, 8, 4}, -- left
+            {2, 6, 7, 3}, -- right
+            {4, 3, 7, 8}, -- top
+            {1, 2, 6, 5}, -- bottom
+        },
+        halfTop = {
+            {1, 2, 3, 4}, -- front
+            {5, 6, 7, 8}, -- back
+            {1, 5, 8, 4}, -- left
+            {2, 6, 7, 3}, -- right
+            {4, 3, 7, 8}, -- top
+            {1, 2, 6, 5}, -- bottom
+        },
+        halfBot = {
+            {1, 2, 3, 4}, -- front
+            {5, 6, 7, 8}, -- back
+            {1, 5, 8, 4}, -- left
+            {2, 6, 7, 3}, -- right
+            {4, 3, 7, 8}, -- top
+            {1, 2, 6, 5}, -- bottom
+        },
+        slope = {
+            {1, 3, 2},        -- přední trojúhelník
+            {4, 6, 5},        -- zadní trojúhelník
+            {1, 4, 6, 3},     -- levá strana
+            {2, 5, 4, 1},     -- pravá strana
+            {3, 6, 5, 2},     -- šikmá horní plocha
+            {1, 2, 5, 4},     -- spodní plocha
+        }
     }
 
     scale = 100
@@ -141,10 +105,11 @@ end
 function love.draw()
     local facesToDraw = {}
     matrixMath.calculateProjections()
+
     for key, value in pairs(points) do
         local projectedPoints = {}
-        if value.type == "block" or value.type == "halfTop" or value.type == "halfBot" or value.type == "slope"then
-            for i = 1, 8 do
+        if value.type == "block" or value.type == "halfTop" or value.type == "halfBot" or value.type == "slope" then
+            for i = 1, #_G.types[value.type] do
                 local rotMatrixX = matrixMath.getXRotationMatrix(value.metadata.rotX)
                 local rotMatrixY = matrixMath.getYRotationMatrix(value.metadata.rotY)
                 local rotMatrixZ = matrixMath.getZRotationMatrix(value.metadata.rotZ)
@@ -155,23 +120,18 @@ function love.draw()
                 rotate = matrixMath.matrixMultiply(rotMatrixY, rotate)
                 rotate = matrixMath.matrixMultiply(rotMatrixZ, rotate)
 
-                --local rotate = matrixMath.matrixMultiply(matrixMath.yRotationAngle, rotatedPoint)
-                --rotate = matrixMath.matrixMultiply(matrixMath.xRotationAngle, rotate)
-                --rotate = matrixMath.matrixMultiply(matrixMath.zRotationAngle, rotate)
-
                 local WorldPoint = JEM.WorldPoint(value, i, {x = rotate[1], y = rotate[2], z = rotate[3]})
                 local relativePos = {
                     WorldPoint[1] - player.camera.posX,
                     WorldPoint[2] - player.camera.posY,
                     WorldPoint[3] - player.camera.posZ
                 }
-                
+
                 local cameraRot = matrixMath.matrixMultiply(matrixMath.yRotationAngle, relativePos)
                 cameraRot = matrixMath.matrixMultiply(matrixMath.xRotationAngle, cameraRot)
                 cameraRot = matrixMath.matrixMultiply(matrixMath.zRotationAngle, cameraRot)
 
                 local projected = matrixMath.matrixMultiply(matrixMath.projectedMatrix, cameraRot)
-                
                 projected[1] = projected[1] / cameraRot[3]
                 projected[2] = projected[2] / cameraRot[3]
 
@@ -182,16 +142,17 @@ function love.draw()
                 else
                     projectedPoints[i] = nil
                 end
+
             end
 
             local col = value.metadata.color
 
-            for _, face in ipairs(faces) do
+            for _, face in ipairs(_G.faces[value.type]) do
                 local verts = {}
                 local sumZ = 0
                 local count = 0
-
                 local faceIsVisible = true
+
                 for _, i in ipairs(face) do
                     local v = projectedPoints[i]
                     if not v then
@@ -199,7 +160,7 @@ function love.draw()
                         break
                     end
 
-                    table.insert(verts, {v.x, v.y, v.z, 0, col[1], col[2], col[3], col[4]})
+                    table.insert(verts, {v.x, v.y, 0, 0, col[1], col[2], col[3], col[4]})
                     sumZ = sumZ + v.z
                     count = count + 1
                 end
@@ -210,15 +171,15 @@ function love.draw()
                 end
             end
         end
+    end
 
-        table.sort(facesToDraw, function(a, b)
-            return a.avgZ > b.avgZ
-        end)
+    table.sort(facesToDraw, function(a, b)
+        return a.avgZ > b.avgZ
+    end)
 
-        for _, faceData in ipairs(facesToDraw) do
-            meshes.block1:setVertices(faceData.verts)
-            love.graphics.draw(meshes.block1)
-        end
+    for _, faceData in ipairs(facesToDraw) do
+        local mesh = love.graphics.newMesh({{"VertexPosition", "float", 2}, {"VertexTexCoord", "float", 2}, {"VertexColor", "byte", 4}}, faceData.verts, "fan", "static")
+        love.graphics.draw(mesh)
     end
 end
 
