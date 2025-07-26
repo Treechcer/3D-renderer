@@ -250,18 +250,6 @@ function love.update(dt)
     if love.keyboard.isDown("q") then
         love.event.quit()
     end
-
-    if love.keyboard.isDown("t") then
-        points[1].metadata.rotX = points[1].metadata.rotX + (2 * dt)
-    end
-
-    if love.keyboard.isDown("r") then
-        points[1].metadata.rotY = points[1].metadata.rotY + (2 * dt)
-    end
-
-    if love.keyboard.isDown("z") then
-        points[1].metadata.rotZ = points[1].metadata.rotZ + (2 * dt)
-    end
 end
 
 function connectPoint(i, j, points)
