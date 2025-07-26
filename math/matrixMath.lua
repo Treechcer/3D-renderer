@@ -46,11 +46,11 @@ function matrixMath.getYRotationMatrix(angle)
 end
 
 function matrixMath.getZRotationMatrix(angle)
-        return {
-            {math.cos(angle), -math.sin(angle), 0},
-            {math.sin(angle), math.cos(angle), 0},
-            {0,0,1}
-        }
+    return {
+        {math.cos(angle), -math.sin(angle), 0},
+        {math.sin(angle), math.cos(angle), 0},
+        {0,0,1}
+    }
 end
 
 return matrixMath
