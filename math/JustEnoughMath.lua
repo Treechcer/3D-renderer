@@ -8,11 +8,11 @@ function JEM.dotProduct(a, b)
     return a.x * b.x + a.y * b.x + a.z * b.z
 end
 
-function JEM.WorldPoint(points, index, key)
+function JEM.WorldPoint(point, index, XYZ)
     return {
-        points[key][index][1] + points[key].metadata.posX,
-        points[key][index][2] + points[key].metadata.posY,
-        points[key][index][3] + points[key].metadata.posZ,
+        XYZ.x + point.metadata.posX,
+        XYZ.y + point.metadata.posY,
+        XYZ.z + point.metadata.posZ,
     }
 end
 

@@ -21,23 +21,36 @@ function matrixMath.matrixMultiply(projectedMatrix, multiplyMatrix)
 end
 
 function matrixMath.calculateProjections()
-    matrixMath.zRotationAngle = {
-        {math.cos(player.camera.angle), -math.sin(player.camera.angle), 0},
-        {math.sin(player.camera.angle), math.cos(player.camera.angle), 0},
-        {0,0,1}
-    }
+    matrixMath.zRotationAngle = matrixMath.getZRotationMatrix(player.camera.angle)
 
-    matrixMath.yRotationAngle = {
-        {math.cos(player.camera.yaw), 0, math.sin(player.camera.yaw)},
-        {0, 1, 0},
-        {-math.sin(player.camera.yaw), 0, math.cos(player.camera.yaw)},
-    }
+    matrixMath.yRotationAngle = matrixMath.getYRotationMatrix(player.camera.yaw)
 
-    matrixMath.xRotationAngle = {
+    matrixMath.xRotationAngle = matrixMath.getXRotationMatrix(player.camera.pitch)
+end
+
+
+function matrixMath.getXRotationMatrix(angle)
+    return {
         {1, 0, 0},
-        {0, math.cos(player.camera.pitch), -math.sin(player.camera.pitch)},
-        {0, math.sin(player.camera.pitch), math.cos(player.camera.pitch)},
+        {0, math.cos(angle), -math.sin(angle)},
+        {0, math.sin(angle), math.cos(angle)},
     }
+end
+
+function matrixMath.getYRotationMatrix(angle)
+    return {
+        {math.cos(angle), 0, math.sin(angle)},
+        {0, 1, 0},
+        {-math.sin(angle), 0, math.cos(angle)},
+    }
+end
+
+function matrixMath.getZRotationMatrix(angle)
+        return {
+            {math.cos(angle), -math.sin(angle), 0},
+            {math.sin(angle), math.cos(angle), 0},
+            {0,0,1}
+        }
 end
 
 return matrixMath

@@ -11,6 +11,49 @@ function love.load()
     love.mouse.setRelativeMode(true)
     prevMouseX, prevMouseY = love.mouse.getPosition()
 
+    _G.types = {
+        block = {
+            {-1,-1,1},
+            {1,-1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        },
+        halfTop = {
+            {-1,-1,1},
+            {1,-1,1},
+            {1,0,1},
+            {-1,0,1},
+            {-1,-1,-1},
+            {1,-1,-1},
+            {1,0,-1},
+            {-1,0,-1}
+        },
+        halfBot = {
+            {-1,0,1},
+            {1,0,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,0,-1},
+            {1,0,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        },
+        slope = {
+            {-1,-1,1},
+            {1,1,1},
+            {1,1,1},
+            {-1,1,1},
+            {-1,-1,-1},
+            {1,1,-1},
+            {1,1,-1},
+            {-1,1,-1}
+        }
+    }
+
     points = {
         {
             metadata = {
@@ -18,15 +61,12 @@ function love.load()
                 posY = 0,
                 posZ = 0,
                 color = {246/255, 83/255, 20/255,1},
+
+                rotX = 0,
+                rotY = 0,
+                rotZ = 0,
             },
-            {-1,-1,1},
-            {1,-1,1},
-            {1,1,1},
-            {-1,1,1},
-            {-1,-1,-1},
-            {1,-1,-1},
-            {1,1,-1},
-            {-1,1,-1}
+            type = "block"
         },
         {
             metadata = {
@@ -34,15 +74,12 @@ function love.load()
                 posY = 0,
                 posZ = 0,
                 color = {124/255, 187/255, 0/255,1},
+
+                rotX = 0,
+                rotY = 0,
+                rotZ = 0,
             },
-            {-1,-1,1},
-            {1,-1,1},
-            {1,1,1},
-            {-1,1,1},
-            {-1,-1,-1},
-            {1,-1,-1},
-            {1,1,-1},
-            {-1,1,-1}
+            type = "block"
         },
         {
             metadata = {
@@ -50,15 +87,12 @@ function love.load()
                 posY = 2,
                 posZ = 0,
                 color = {255/255, 187/255, 0/255,1},
+
+                rotX = 0,
+                rotY = 0,
+                rotZ = 0,
             },
-            {-1,-1,1},
-            {1,-1,1},
-            {1,1,1},
-            {-1,1,1},
-            {-1,-1,-1},
-            {1,-1,-1},
-            {1,1,-1},
-            {-1,1,-1}
+            type = "block"
         },
         {
             metadata = {
@@ -66,15 +100,25 @@ function love.load()
                 posY = 2,
                 posZ = 0,
                 color = {0/255, 164/255, 239/255,1},
+
+                rotX = 0,
+                rotY = 0,
+                rotZ = 0,
             },
-            {-1,-1,1},
-            {1,-1,1},
-            {1,1,1},
-            {-1,1,1},
-            {-1,-1,-1},
-            {1,-1,-1},
-            {1,1,-1},
-            {-1,1,-1}
+            type = "block"
+        },
+        {
+            metadata = {
+                posX = 4,
+                posY = 4,
+                posZ = 0,
+                color = {0/255, 164/255, 239/255,1},
+
+                rotX = 0,
+                rotY = 0,
+                rotZ = 0,
+            },
+            type = "slope"
         }
     }
 
@@ -96,73 +140,85 @@ end
 
 function love.draw()
     local facesToDraw = {}
-
+    matrixMath.calculateProjections()
     for key, value in pairs(points) do
-        matrixMath.calculateProjections()
         local projectedPoints = {}
+        if value.type == "block" or value.type == "halfTop" or value.type == "halfBot" or value.type == "slope"then
+            for i = 1, 8 do
+                local rotMatrixX = matrixMath.getXRotationMatrix(value.metadata.rotX)
+                local rotMatrixY = matrixMath.getYRotationMatrix(value.metadata.rotY)
+                local rotMatrixZ = matrixMath.getZRotationMatrix(value.metadata.rotZ)
 
-        for i = 1, 8 do
-            local WorldPoint = JEM.WorldPoint(points, i, key)
+                local localPoint = _G.types[value.type][i]
 
-            local relativePos = {
-                WorldPoint[1] - player.camera.posX,
-                WorldPoint[2] - player.camera.posY,
-                WorldPoint[3] - player.camera.posZ
-            }
+                local rotate = matrixMath.matrixMultiply(rotMatrixX, localPoint)
+                rotate = matrixMath.matrixMultiply(rotMatrixY, rotate)
+                rotate = matrixMath.matrixMultiply(rotMatrixZ, rotate)
 
-            local rotate = matrixMath.matrixMultiply(matrixMath.yRotationAngle, relativePos)
-            rotate = matrixMath.matrixMultiply(matrixMath.xRotationAngle, rotate)
-            rotate = matrixMath.matrixMultiply(matrixMath.zRotationAngle, rotate)
+                --local rotate = matrixMath.matrixMultiply(matrixMath.yRotationAngle, rotatedPoint)
+                --rotate = matrixMath.matrixMultiply(matrixMath.xRotationAngle, rotate)
+                --rotate = matrixMath.matrixMultiply(matrixMath.zRotationAngle, rotate)
 
-            local projected = matrixMath.matrixMultiply(matrixMath.projectedMatrix, rotate)
+                local WorldPoint = JEM.WorldPoint(value, i, {x = rotate[1], y = rotate[2], z = rotate[3]})
+                local relativePos = {
+                    WorldPoint[1] - player.camera.posX,
+                    WorldPoint[2] - player.camera.posY,
+                    WorldPoint[3] - player.camera.posZ
+                }
+                
+                local cameraRot = matrixMath.matrixMultiply(matrixMath.yRotationAngle, relativePos)
+                cameraRot = matrixMath.matrixMultiply(matrixMath.xRotationAngle, cameraRot)
+                cameraRot = matrixMath.matrixMultiply(matrixMath.zRotationAngle, cameraRot)
 
-            projected[1] = projected[1] / rotate[3]
-            projected[2] = projected[2] / rotate[3]
+                local projected = matrixMath.matrixMultiply(matrixMath.projectedMatrix, cameraRot)
+                
+                projected[1] = projected[1] / cameraRot[3]
+                projected[2] = projected[2] / cameraRot[3]
 
-            local x = projected[1] * scale + pos[1]
-            local y = projected[2] * scale + pos[2]
-
-            if rotate[3] > 0 then
-                projectedPoints[i] = {x = x, y = y, z = rotate[3]}
-            else
-                projectedPoints[i] = nil
+                if cameraRot[3] > 0 then
+                    local x = projected[1] * scale + pos[1]
+                    local y = projected[2] * scale + pos[2]
+                    projectedPoints[i] = {x = x, y = y, z = cameraRot[3]}
+                else
+                    projectedPoints[i] = nil
+                end
             end
-        end
 
-        local col = points[key].metadata.color
+            local col = value.metadata.color
 
-        for _, face in ipairs(faces) do
-            local verts = {}
-            local sumZ = 0
-            local count = 0
+            for _, face in ipairs(faces) do
+                local verts = {}
+                local sumZ = 0
+                local count = 0
 
-            local faceIsVisible = true
-            for _, i in ipairs(face) do
-                local v = projectedPoints[i]
-                if not v then
-                    faceIsVisible = false
-                    break
+                local faceIsVisible = true
+                for _, i in ipairs(face) do
+                    local v = projectedPoints[i]
+                    if not v then
+                        faceIsVisible = false
+                        break
+                    end
+
+                    table.insert(verts, {v.x, v.y, v.z, 0, col[1], col[2], col[3], col[4]})
+                    sumZ = sumZ + v.z
+                    count = count + 1
                 end
 
-                table.insert(verts, {v.x, v.y, v.z, 0, col[1], col[2], col[3], col[4]})
-                sumZ = sumZ + v.z
-                count = count + 1
-            end
-
-            if faceIsVisible and count > 0 then
-                local avgZ = sumZ / count
-                table.insert(facesToDraw, {verts = verts, avgZ = avgZ})
+                if faceIsVisible and count > 0 then
+                    local avgZ = sumZ / count
+                    table.insert(facesToDraw, {verts = verts, avgZ = avgZ})
+                end
             end
         end
-    end
 
-    table.sort(facesToDraw, function(a, b)
-        return a.avgZ > b.avgZ
-    end)
+        table.sort(facesToDraw, function(a, b)
+            return a.avgZ > b.avgZ
+        end)
 
-    for _, faceData in ipairs(facesToDraw) do
-        meshes.block1:setVertices(faceData.verts)
-        love.graphics.draw(meshes.block1)
+        for _, faceData in ipairs(facesToDraw) do
+            meshes.block1:setVertices(faceData.verts)
+            love.graphics.draw(meshes.block1)
+        end
     end
 end
 
@@ -193,6 +249,18 @@ function love.update(dt)
 
     if love.keyboard.isDown("q") then
         love.event.quit()
+    end
+
+    if love.keyboard.isDown("t") then
+        points[1].metadata.rotX = points[1].metadata.rotX + (2 * dt)
+    end
+
+    if love.keyboard.isDown("r") then
+        points[1].metadata.rotY = points[1].metadata.rotY + (2 * dt)
+    end
+
+    if love.keyboard.isDown("z") then
+        points[1].metadata.rotZ = points[1].metadata.rotZ + (2 * dt)
     end
 end
 
