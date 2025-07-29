@@ -119,12 +119,12 @@ function love.draw()
                 local rotate = matrixMath.matrixMultiply(rotMatrixX, localPoint)
                 rotate = matrixMath.matrixMultiply(rotMatrixY, rotate)
                 rotate = matrixMath.matrixMultiply(rotMatrixZ, rotate)
-                
-                local worldPoint = JEM.WorldPoint(value, i, {x = rotate[1], y = rotate[2], z = rotate[3]})
+
+                local WorldPoint = JEM.WorldPoint(value, i, {x = rotate[1], y = rotate[2], z = rotate[3]})
                 local relativePos = {
-                    worldPoint[1] - player.camera.posX,
-                    worldPoint[2] - player.camera.posY,
-                    worldPoint[3] - player.camera.posZ
+                    WorldPoint[1] - player.camera.posX,
+                    WorldPoint[2] - player.camera.posY,
+                    WorldPoint[3] - player.camera.posZ
                 }
 
                 local cameraRot = matrixMath.matrixMultiply(matrixMath.yRotationAngle, relativePos)
@@ -138,10 +138,7 @@ function love.draw()
                 if cameraRot[3] > 0 then
                     local x = projected[1] * scale + pos[1]
                     local y = projected[2] * scale + pos[2]
-                    projectedPoints[i] = {
-                        x = x, y = y, z = cameraRot[3],
-                        raw3D = { x = cameraRot[1], y = cameraRot[2], z = cameraRot[3] }
-                    }
+                    projectedPoints[i] = {x = x, y = y, z = cameraRot[3]}
                 else
                     projectedPoints[i] = nil
                 end
@@ -151,30 +148,26 @@ function love.draw()
             local col = value.metadata.color
 
             for _, face in ipairs(_G.faces[value.type]) do
-                local tris = triangulate(face)
-                for _, tri in ipairs(tris) do
-                    local verts = {}
-                    local sumZ = 0
-                    local count = 0
-                    local faceIsVisible = true
+                local verts = {}
+                local sumZ = 0
+                local count = 0
+                local faceIsVisible = true
 
-                    for _, i in ipairs(tri) do
-                        local p1, p2, p3 = projectedPoints[tri[1]], projectedPoints[tri[2]], projectedPoints[tri[3]]
-                        if not p1 or not p2 or not p3 or not isFaceVisible(p1.raw3D, p2.raw3D, p3.raw3D) then
-                            faceIsVisible = false
-                            break
-                        end
-
-                        v = projectedPoints[i]
-                        table.insert(verts, {v.x, v.y, 0, 0, col[1], col[2], col[3], col[4]})
-                        sumZ = sumZ + v.z
-                        count = count + 1
+                for _, i in ipairs(face) do
+                    local v = projectedPoints[i]
+                    if not v then
+                        faceIsVisible = false
+                        break
                     end
 
-                    if faceIsVisible and count > 0 then
-                        local avgZ = sumZ / count
-                        table.insert(facesToDraw, {verts = verts, avgZ = avgZ})
-                    end
+                    table.insert(verts, {v.x, v.y, 0, 0, col[1], col[2], col[3], col[4]})
+                    sumZ = sumZ + v.z
+                    count = count + 1
+                end
+
+                if faceIsVisible and count > 0 then
+                    local avgZ = sumZ / count
+                    table.insert(facesToDraw, {verts = verts, avgZ = avgZ})
                 end
             end
         end
@@ -229,23 +222,4 @@ end
 function love.mousemoved(dx, dy, x, y, istouch)
     player.camera.yaw = player.camera.yaw + x * player.camera.sensitivity
     player.camera.pitch = player.camera.pitch - y * player.camera.sensitivity
-end
-
-function triangulate(face)
-    local triangles = {}
-    for i = 2, #face - 1 do
-        table.insert(triangles, {face[1], face[i], face[i + 1]})
-    end
-    return triangles
-end
-
-function isFaceVisible(p1, p2, p3)
-    local endge0 = JEM.sub(p2, p1)
-    local endge1 = JEM.sub(p3, p1)
-
-    local normal = JEM.crossProduct(endge0, endge1)
-    local vievVector = JEM.sub({x = player.camera.posX, y = player.camera.posY, z = player.camera.posZ}, p1)
-    local dp = JEM.dotProduct(normal, vievVector)
-
-    return dp < 0
 end
